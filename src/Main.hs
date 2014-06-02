@@ -8,6 +8,7 @@ import           Data.List
 import           Data.Version
 
 import           Parser
+import           Runtime
 import qualified Paths_mooninite as P
 
 -- option stuff all based on GetOpt haddock example
@@ -50,7 +51,7 @@ options =
     "check syntax and exit"
     , Option "c"     ["intermediate"]
     (NoArg (\opts -> opts { optIntermediate = True }))
-    "output lua file and exit without invoking lua intepreter"
+    "output lua file and exit without invoking lua interpreter"
     , Option "P"     ["print-runtime"]
     (NoArg (\opts -> opts { optStdOut = runtime}))
     "print runtime to standard output and exit"
@@ -59,7 +60,7 @@ options =
     "include runtime directly in output instead of in library"
     , Option "h"     ["help"]
     (NoArg (\opts -> opts { optStdOut = usage}))
-    "show help"
+    "show this message and exit"
     , Option "o"     ["output"]
     (ReqArg (\f opts -> opts { optOutput = f }) "-")
     "output FILE; defaults to stdout (-)"
@@ -71,13 +72,11 @@ compilerOpts argv =
         (o,n,[]  ) -> return (foldl (flip id) defaultOptions o, n)
         (_,_,errs) -> ioError $ userError $ concat errs ++ usage
 
-usage,version,runtime :: String
+usage,version :: String
 usage = usageInfo header options
   where header = version ++ "\nUsage: mooninite [OPTION...] files...\n"
                          ++ "       use - to read from stdin"
-
-version = "mooninite version " ++ (showVersion P.version) ++ "\n"
-runtime = "runtime\n"
+version = "mooninite version " ++ showVersion P.version ++ "\n"
 
 -- Once we start reading from stdin, that's it.
 allIn :: [FilePath] -> IO String
@@ -94,10 +93,9 @@ generateLua :: Show a => a -> String
 generateLua = show
 
 main = do
-    x <- getArgs
-    (os,as) <- compilerOpts x
+    (os,as) <- getArgs >>= compilerOpts
     when (optStdOut os /= "") $ putStr (optStdOut os) >> exitSuccess
-    lisp <- allIn as
-    let lua = generateLua $ parseLisp (intercalate ", " as) lisp
-    allOut (optOutput os) lua
+    liftM (compile as) (allIn as) >>= allOut (optOutput os)
+    when (optIntermediate os) exitSuccess
     return ()
+  where compile as = generateLua . parseLisp (intercalate ", " as)

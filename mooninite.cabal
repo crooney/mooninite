@@ -4,24 +4,32 @@
 name:                mooninite
 version:             0.0.1.0
 synopsis:            Scheme to lua transpiler.
--- description:
+description:         A LISP-1 (Scheme, more or less) that compiles to Lua,
+                     originally intended for writing neovim extensions when
+                     neovim is released, although generally useful.
 homepage:            https://github.com/crooney/mooninite
+bug-reports:         https://github.com/crooney/cinder/issues
 license:             BSD3
 license-file:        LICENSE
 author:              Chris Rooney
 maintainer:          christopher.j.rooney@gmail.com
--- copyright:
+copyright:           Chris Rooney 2014
 category:            Development
-build-type:          Simple
+build-type:          Custom
 -- extra-source-files:
 cabal-version:       >=1.10
+
+source-repository head
+  type: git
+  location: https://github.com/crooney/mooninite
 
 executable mooninite
   main-is:             Main.hs
   other-modules:       Paths_mooninite
+                       Runtime
   -- other-extensions:
   build-depends:
-          base >=4.6
+          base >=4.6 && <5
         , uu-parsinglib
-  hs-source-dirs:      src
+  hs-source-dirs:      src, lua
   default-language:    Haskell2010
