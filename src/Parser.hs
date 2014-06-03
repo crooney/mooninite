@@ -10,18 +10,7 @@ import           Text.ParserCombinators.UU.Core
 import           Text.ParserCombinators.UU.BasicInstances
 import           Text.ParserCombinators.UU.Utils
 
-data Exp = LAtom String
-         | LIdent String
-         | LString String
-         | LNumber Double
-         | LCons Exp Exp
-         | LNil
-         | LBool Bool
-         | LQuote Exp
-         | LQuasi Exp
-         | LList [Exp]
-         | LComment String
-  deriving Show
+import           Types
 
 (<++>) :: Parser String -> Parser String -> Parser String
 p <++> q = (++) <$> p <*> q
