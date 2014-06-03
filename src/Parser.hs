@@ -8,7 +8,7 @@ module Parser (
 import           Text.ParserCombinators.UU.Derived
 import           Text.ParserCombinators.UU.Core
 import           Text.ParserCombinators.UU.BasicInstances
-import           Text.ParserCombinators.UU.Utils
+import           Text.ParserCombinators.UU.Utils hiding (pSpaces, lexeme)
 
 import           Types
 
@@ -75,12 +75,18 @@ pQuote = pQuoted LQuote '\''
 pQuasi :: Parser Exp
 pQuasi = pQuoted LQuasi '`'
 
+pSpaces :: Parser String
+pSpaces = (const "") <$> (pMany $ pAnySym " \t\r\n")
+
 pComment :: Parser Exp
 pComment = lexeme $ LComment <$>
     ((const "" <$> pToken ";|" <* pSexp)
     <<|> (pToken ";#" *> pMunch (/= '\n'))
     <<|> (const "" <$> (pToken ";" *> pMunch (/= '\n'))))
     <?> "Comment"
+
+lexeme :: ParserTrafo a a
+lexeme p = p <* pSpaces
 
 walkQuotes :: (Exp -> Exp) -> [Exp] -> [Exp]
 walkQuotes f = map go
