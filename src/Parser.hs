@@ -1,8 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables, NoMonomorphismRestriction,
     FlexibleInstances, FlexibleContexts, RankNTypes #-}
 module Parser (
-      Exp
-    , parseLisp
+      parseLisp
     ) where
 
 import           Text.ParserCombinators.UU.Derived
@@ -15,8 +14,8 @@ import           Types
 (<++>) :: Parser String -> Parser String -> Parser String
 p <++> q = (++) <$> p <*> q
 
-liftS :: ParserTrafo Char String
-liftS = ((:[]) <$>)
+liftL :: ParserTrafo a [a]
+liftL = ((:[]) <$>)
 
 badChars :: String
 badChars = ":$%&*+/<=>@\\^|-~"
@@ -30,56 +29,49 @@ cleanChars = concatMap go
           | otherwise         = [x]
 
 pName :: Parser String
-pName = lexeme $ cleanChars <$> (liftS (pLetter <|> pAnySym "*")
+pName = lexeme $ cleanChars <$> (liftL (pLetter <|> pAnySym "*")
         <++> pMany (pDigit <|> pLetter <|> pAnySym (".!?" ++ badChars)))
 
-pIdent :: Parser Exp
-pIdent = lexeme $ go <$> pName <?> "Identifier"
+pIdent :: Parser Terminal
+pIdent = go <$> pName <?> "Identifier"
   where go "nil" = LNil
         go x     = LIdent x
 
-pAtom :: Parser Exp
-pAtom = lexeme $ go <$> (liftS (pSym '#') <++> pName) <?> "Atom"
+pAtom :: Parser Terminal
+pAtom = go <$> (liftL (pSym '#') <++> pName) <?> "Atom"
   where go "#f" = LBool False
         go x    = LAtom x
 
-pNumber :: Parser Exp
-pNumber = lexeme $ LNumber <$> pDouble <?> "Number"
+pNumber :: Parser Terminal
+pNumber = LNumber <$> pDouble <?> "Number"
 
-pString :: Parser Exp
-pString = lexeme $ LString <$> pQuotedString <?> "Normal String"
+pString :: Parser Terminal
+pString = LString <$> pQuotedString <?> "Normal String"
 
 pMultiLine :: Parser String
 pMultiLine = pBrackets (pBrackets (pMunch (/= ']')))
 
-pRawString :: Parser Exp
-pRawString = lexeme $ LString <$> pMultiLine
-             <?> "Raw String"
+pRawString :: Parser Terminal
+pRawString = LString <$> pMultiLine <?> "Raw String"
 
-pSexp :: Parser [Exp]
-pSexp = lexeme $ pParens (pList $ lexeme $
-    foldr1 (<|>) [pAtom, pIdent, pNumber, pString, pRawString, pQuote , pQuasi,
-                  liftList pSexp, pComment])
+pTerm :: Parser Sexp
+pTerm = lexeme $ foldr1 (<|>) (map (Term <$>) [pAtom, pIdent, pNumber, pString,
+                                               pRawString, pComment])
+
+pSexp :: Parser Sexp
+pSexp = pParens (Cons <$> pList (pTerm <|> pSexp <|> pQuote))
     <?> "S-expression"
 
-liftList :: ParserTrafo [Exp] Exp
-liftList = (LList <$>)
-
-pQuoted :: (Exp -> Exp) -> Char -> Parser Exp
-pQuoted f c = lexeme $ pSym c *> (liftList (walkQuotes f <$> pSexp)
-              <|> (f <$> (pIdent <|> pAtom))) <?> c : " Quote"
-
-pQuote :: Parser Exp
-pQuote = pQuoted LQuote '\''
-
-pQuasi :: Parser Exp
-pQuasi = pQuoted LQuasi '`'
+pQuote :: Parser Sexp
+pQuote = lexeme $ Cons <$> (terminal '\'' "quote" <|> terminal '`' "quasiquote")
+  where terminal c s = ([Term $ LIdent s] ++) <$> quoted c
+        quoted c = pSym c *> liftL (pSexp <|> pTerm <|> pQuote)
 
 pSpaces :: Parser String
-pSpaces = (const "") <$> (pMany $ pAnySym " \t\r\n")
+pSpaces = const "" <$> pMany (pAnySym " \t\r\n")
 
-pComment :: Parser Exp
-pComment = lexeme $ LComment <$>
+pComment :: Parser Terminal
+pComment = LComment <$>
     ((const "" <$> pToken ";|" <* pSexp)
     <<|> (pToken ";#" *> pMunch (/= '\n'))
     <<|> (const "" <$> (pToken ";" *> pMunch (/= '\n'))))
@@ -88,13 +80,6 @@ pComment = lexeme $ LComment <$>
 lexeme :: ParserTrafo a a
 lexeme p = p <* pSpaces
 
-walkQuotes :: (Exp -> Exp) -> [Exp] -> [Exp]
-walkQuotes f = map go
-  where go (LList x)  = LList (walkQuotes f x)
-        go (LIdent x) = f $ LIdent x
-        go (LAtom x)  = f $ LAtom x
-        go x          = x
-
-parseLisp :: String -> String -> Exp
+parseLisp :: String -> String -> Sexp
 parseLisp inputName = runParser inputName p
-  where p = pSpaces *> liftList (pList1 (liftList pSexp))
+  where p = pSpaces *> (Cons <$> pList1 pSexp)

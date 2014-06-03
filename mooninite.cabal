@@ -27,6 +27,7 @@ executable mooninite
   main-is:             Main.hs
   other-modules:       Paths_mooninite
                        Runtime
+  ghc-options:         -Wall
   -- other-extensions:
   build-depends:
           base >=4.6 && <5

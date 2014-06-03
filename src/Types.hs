@@ -1,17 +1,19 @@
 module Types (
-    Exp (..)
+      Terminal (..)
+    , Sexp (..)
     ) where
 
-import Data.Foldable
+data Sexp = Term Terminal | Cons [Sexp]
+  deriving (Show, Eq)
 
-data Exp = LAtom String
+data Terminal = LAtom String
          | LIdent String
          | LString String
          | LNumber Double
          | LNil
          | LBool Bool
-         | LQuote Exp
-         | LQuasi Exp
-         | LList [Exp]
+         | LQuote Terminal
+         | LQuasi Terminal
          | LComment String
   deriving (Show, Eq)
+

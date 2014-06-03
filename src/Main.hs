@@ -9,6 +9,7 @@ import           Data.List
 import           Data.Version
 
 import           Parser
+import           Generator
 import           Runtime
 import qualified Paths_mooninite as P
 
@@ -25,6 +26,7 @@ data Options   = Options { oVerbose        :: Bool
                          }
                          deriving Show
 
+defaultOptions :: Options
 defaultOptions = Options { oVerbose        = False
                          , oShowVersion    = False
                          , oCheckSyntax    = False
@@ -93,9 +95,7 @@ allOut "-" = putStr
 allOut p   = writeFile extended
     where extended = if '.' `elem` p then p else p ++ ".lua"
 
-generateLua :: Show a => a -> String
-generateLua = show
-
+main :: IO ()
 main = do
     (os,as) <- getArgs >>= compilerOpts
     info os $ "compiling to " ++ oOutput os
@@ -104,7 +104,7 @@ main = do
     (code,out,err) <- readProcessWithExitCode (oLua os) [oOutput os] ""
     when (code /= ExitSuccess) $ info os $ oLua os ++ " failed with: "
     putStr out >> hPutStr stderr err
-    exitWith code
+    _ <- exitWith code
     return ()
-  where compile as = generateLua . parseLisp (intercalate ", " as)
+  where compile as = generate . parseLisp (intercalate ", " as)
         info os m = when (oVerbose os) $ hPutStrLn stderr m
