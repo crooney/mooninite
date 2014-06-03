@@ -31,5 +31,6 @@ executable mooninite
   build-depends:
           base >=4.6 && <5
         , uu-parsinglib
+        , process
   hs-source-dirs:      src, lua
   default-language:    Haskell2010

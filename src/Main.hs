@@ -1,5 +1,6 @@
 import           System.Console.GetOpt
 import           System.Environment
+import           System.Process
 import           System.Exit
 import           System.IO
 import           Control.Monad
@@ -11,58 +12,61 @@ import           Parser
 import           Runtime
 import qualified Paths_mooninite as P
 
--- option stuff all based on GetOpt haddock example
-data Options   = Options { optVerbose        :: Bool
-                         , optShowVersion    :: Bool
-                         , optCheckSyntax    :: Bool
-                         , optIntermediate   :: Bool
-                         , optOptimize       :: Bool
-                         , optIncludeRuntime :: Bool
-                         , optOutput         :: FilePath
-                         , optStdOut         :: String
-                         , optStdErr         :: String
+-- oion stuff all based on GetOpt haddock example
+data Options   = Options { oVerbose        :: Bool
+                         , oShowVersion    :: Bool
+                         , oCheckSyntax    :: Bool
+                         , oIntermediate   :: Bool
+                         , oOptimize       :: Bool
+                         , oIncludeRuntime :: Bool
+                         , oOutput         :: FilePath
+                         , oStdOut         :: String
+                         , oLua            :: String
                          }
                          deriving Show
 
-defaultOptions = Options { optVerbose        = False
-                         , optShowVersion    = False
-                         , optCheckSyntax    = False
-                         , optIntermediate   = False
-                         , optOptimize       = False
-                         , optIncludeRuntime = False
-                         , optOutput         = "-"
-                         , optStdOut         = ""
-                         , optStdErr         = ""
+defaultOptions = Options { oVerbose        = False
+                         , oShowVersion    = False
+                         , oCheckSyntax    = False
+                         , oIntermediate   = False
+                         , oOptimize       = False
+                         , oIncludeRuntime = False
+                         , oOutput         = "-"
+                         , oStdOut         = ""
+                         , oLua            = "lua"
                          }
 
 options :: [OptDescr (Options -> Options)]
 options =
     [ Option "v"     ["verbose"]
-    (NoArg (\opts -> opts { optVerbose = True }))
+    (NoArg (\os -> os { oVerbose = True }))
     "chatty output on stderr"
     , Option "V?"    ["version"]
-    (NoArg (\opts -> opts { optStdOut = version}))
+    (NoArg (\os -> os { oStdOut = version}))
     "show version number"
-    , Option "O"     ["optimize"]
-    (NoArg (\opts -> opts { optOptimize = True }))
-    "optimize (currently does nothing)"
+    , Option "O"     ["oimize"]
+    (NoArg (\os -> os { oOptimize = True }))
+    "oimize (currently does nothing)"
     , Option "s"     ["check-syntax"]
-    (NoArg (\opts -> opts { optCheckSyntax = True }))
+    (NoArg (\os -> os { oCheckSyntax = True }))
     "check syntax and exit"
     , Option "c"     ["intermediate"]
-    (NoArg (\opts -> opts { optIntermediate = True }))
+    (NoArg (\os -> os { oIntermediate = True }))
     "output lua file and exit without invoking lua interpreter"
     , Option "P"     ["print-runtime"]
-    (NoArg (\opts -> opts { optStdOut = runtime}))
+    (NoArg (\os -> os { oStdOut = runtime}))
     "print runtime to standard output and exit"
     , Option "I"     ["include-runtime"]
-    (NoArg (\opts -> opts { optIncludeRuntime = True }))
+    (NoArg (\os -> os { oIncludeRuntime = True }))
     "include runtime directly in output instead of in library"
     , Option "h"     ["help"]
-    (NoArg (\opts -> opts { optStdOut = usage}))
+    (NoArg (\os -> os { oStdOut = usage}))
     "show this message and exit"
+    , Option "i"     ["interpreter"]
+    (ReqArg (\f os -> os { oLua = f }) "lua")
+    "lua complier/interpreter to invoke; defaults to 'lua'"
     , Option "o"     ["output"]
-    (ReqArg (\f opts -> opts { optOutput = f }) "-")
+    (ReqArg (\f os -> os { oOutput = f }) "-")
     "output FILE; defaults to stdout (-)"
     ]
 
@@ -94,8 +98,13 @@ generateLua = show
 
 main = do
     (os,as) <- getArgs >>= compilerOpts
-    when (optStdOut os /= "") $ putStr (optStdOut os) >> exitSuccess
-    liftM (compile as) (allIn as) >>= allOut (optOutput os)
-    when (optIntermediate os) exitSuccess
+    info os $ "compiling to " ++ oOutput os
+    liftM (compile as) (allIn as) >>= allOut (oOutput os)
+    when (oIntermediate os || oOutput os == "-") exitSuccess
+    (code,out,err) <- readProcessWithExitCode (oLua os) [oOutput os] ""
+    when (code /= ExitSuccess) $ info os $ oLua os ++ " failed with: "
+    putStr out >> hPutStr stderr err
+    exitWith code
     return ()
   where compile as = generateLua . parseLisp (intercalate ", " as)
+        info os m = when (oVerbose os) $ hPutStrLn stderr m
