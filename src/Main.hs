@@ -9,11 +9,10 @@ import           Data.List
 import           Data.Version
 
 import           Parser
-import           Generator
 import           Runtime
 import qualified Paths_mooninite as P
 
--- oion stuff all based on GetOpt haddock example
+-- option stuff all based on GetOpt haddock example
 data Options   = Options { oVerbose        :: Bool
                          , oShowVersion    :: Bool
                          , oCheckSyntax    :: Bool
@@ -24,7 +23,7 @@ data Options   = Options { oVerbose        :: Bool
                          , oStdOut         :: String
                          , oLua            :: String
                          }
-                         deriving Show
+                        deriving Show
 
 defaultOptions :: Options
 defaultOptions = Options { oVerbose        = False
@@ -40,43 +39,32 @@ defaultOptions = Options { oVerbose        = False
 
 options :: [OptDescr (Options -> Options)]
 options =
-    [ Option "v"     ["verbose"]
-    (NoArg (\os -> os { oVerbose = True }))
+    [ Option "v"     ["verbose"] (NoArg (\os -> os { oVerbose = True }))
     "chatty output on stderr"
-    , Option "V?"    ["version"]
-    (NoArg (\os -> os { oStdOut = version}))
+    , Option "V?"    ["version"] (NoArg (\os -> os { oStdOut = version}))
     "show version number"
-    , Option "O"     ["oimize"]
-    (NoArg (\os -> os { oOptimize = True }))
-    "oimize (currently does nothing)"
-    , Option "s"     ["check-syntax"]
-    (NoArg (\os -> os { oCheckSyntax = True }))
+    , Option "O"     ["optimize"] (NoArg (\os -> os { oOptimize = True }))
+    "optimize (currently does nothing)"
+    , Option "s"     ["check-syntax"] (NoArg (\os -> os { oCheckSyntax = True }))
     "check syntax and exit"
-    , Option "c"     ["intermediate"]
-    (NoArg (\os -> os { oIntermediate = True }))
+    , Option "c"     ["intermediate"] (NoArg (\os -> os { oIntermediate = True }))
     "output lua file and exit without invoking lua interpreter"
-    , Option "P"     ["print-runtime"]
-    (NoArg (\os -> os { oStdOut = runtime}))
+    , Option "P"     ["print-runtime"] (NoArg (\os -> os { oStdOut = runtime}))
     "print runtime to standard output and exit"
-    , Option "I"     ["include-runtime"]
-    (NoArg (\os -> os { oIncludeRuntime = True }))
+    , Option "I"     ["include-runtime"] (NoArg (\os -> os { oIncludeRuntime = True }))
     "include runtime directly in output instead of in library"
-    , Option "h"     ["help"]
-    (NoArg (\os -> os { oStdOut = usage}))
+    , Option "h"     ["help"] (NoArg (\os -> os { oStdOut = usage}))
     "show this message and exit"
-    , Option "i"     ["interpreter"]
-    (ReqArg (\f os -> os { oLua = f }) "lua")
+    , Option "i"     ["interpreter"] (ReqArg (\f os -> os { oLua = f }) "lua")
     "lua complier/interpreter to invoke; defaults to 'lua'"
-    , Option "o"     ["output"]
-    (ReqArg (\f os -> os { oOutput = f }) "-")
+    , Option "o"     ["output"] (ReqArg (\f os -> os { oOutput = f }) "-")
     "output FILE; defaults to stdout (-)"
     ]
 
 compilerOpts :: [String] -> IO (Options, [String])
-compilerOpts argv =
-    case getOpt Permute options argv of
-        (o,n,[]  ) -> return (foldl (flip id) defaultOptions o, n)
-        (_,_,errs) -> ioError $ userError $ concat errs ++ usage
+compilerOpts argv = case getOpt Permute options argv of
+                      (o,n,[]  ) -> return (foldl (flip id) defaultOptions o, n)
+                      (_,_,errs) -> ioError $ userError $ concat errs ++ usage
 
 usage,version :: String
 usage = usageInfo header options
@@ -107,5 +95,5 @@ main = do
     putStr out >> hPutStr stderr err
     _ <- exitWith code
     return ()
-  where compile as = generate . parseLisp (intercalate ", " as)
+  where compile as = parseLisp (intercalate ", " as)
         info os m = when (oVerbose os) $ hPutStrLn stderr m
