@@ -98,6 +98,7 @@ allOut p   = writeFile extended
 main :: IO ()
 main = do
     (os,as) <- getArgs >>= compilerOpts
+    when (oStdOut os /= "") (putStrLn (oStdOut os) >> exitSuccess)
     info os $ "compiling to " ++ oOutput os
     liftM (compile as) (allIn as) >>= allOut (oOutput os)
     when (oIntermediate os || oOutput os == "-") exitSuccess
