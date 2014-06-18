@@ -6,6 +6,7 @@ import Distribution.Simple.Utils
 import Data.Char (toUpper,toLower)
 import Control.Monad (liftM)
 import System.FilePath (takeBaseName)
+import GHC.Show (showLitString)
 
 main = defaultMainWithHooks theHooks
   where theHooks = simpleUserHooks
@@ -20,7 +21,7 @@ ppTextAsString _ _ = PreProcessor
                >> liftM process (readFile i) >>= writeFile o
       where
         process = (header ++) . unlines . map go . lines
-        go x = "  ++ \"" ++ x ++ "\\n\""
+        go x = "  ++ \"" ++ showLitString x "\\n\""
         header = "module "++uname ++ " where\n\n" ++ dname ++ " :: String\n"
                  ++ dname ++ " = \"\"\n"
         dname = toLower (head $ takeBaseName i) : tail (takeBaseName i)
