@@ -4,7 +4,8 @@
 let
   inherit (haskellPackages) cabal cabalInstall
     # Haskell dependencies here
-    uuParsinglib;
+    uuParsinglib optparseApplicative;
+
 
 in cabal.mkDerivation (self: {
   pname = "mooninite";
@@ -12,7 +13,7 @@ in cabal.mkDerivation (self: {
   src = ./.;
   buildDepends = [
     # As imported above
-    uuParsinglib
+    uuParsinglib optparseApplicative
   ];
   buildTools = [ cabalInstall ];
   enableSplitObjs = false;
