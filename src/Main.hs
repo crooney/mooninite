@@ -26,7 +26,7 @@ options = Options
        <> help "Compile to lua but don't invoke lua interpreter" )
     <*> strOption ( short 'i' <> metavar "PROGRAM" <> value "lua" <> showDefault
        <> help "Invoke PROGRAM as lua interpreter" )
-    <*> strOption ( short 'o' <> metavar "FILE"
+    <*> strOption ( short 'o' <> metavar "FILE" <> value ""
        <> help "Output to FILE instead of STDOUT" )
     <* infoOption version ( long "version" <> help "Display version info" )
     <* infoOption runtime ( long "print-runtime"
@@ -53,7 +53,8 @@ mainWithOpts :: Options -> IO ()
 mainWithOpts os = do
     inform $ "Compiling to " ++ if null (oOutput os) then "STDOUT"
                                                      else oOutput os
-    liftM (compile $ oInput os) (allIn $ oInput os) >>= fOut
+    ((++) <$> return runtime <*> liftM (compile $ oInput os) (allIn $ oInput os))
+      >>= fOut
     when (oIntermediate os || null (oOutput os)) exitSuccess
     (code,out,err) <- readProcessWithExitCode (oLua os) [oOutput os] ""
     when (code /= ExitSuccess) $ inform $ oLua os ++ " failed with: "

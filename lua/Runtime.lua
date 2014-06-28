@@ -1,15 +1,5 @@
 -- mooninite Lisp-1 -> Lua runtime
 --
--- require "Runtime" to access. Should be done automatically when using
--- mooninite.
-
--- imports from global libs
---
-
--- don't pollute global space inadvertantly
---_ENV = nil
-
--- exports at end.
 
 local function id (...) return ... end
 
@@ -18,6 +8,7 @@ local function thunk(value)
 end
 
 local function force(thunk)
+    if type(thunk) ~= 'table' then return thunk end
     if thunk[2] then return thunk[2] end
     local t = thunk
     while type(t) == 'table' do
@@ -135,3 +126,16 @@ end
                   filter(function(x) return x ~= 3 end,n)))
     assert(length(append(l,m)) == 6)
 --]]
+
+function ifthenelse(pred,th,el)
+    --local el = el or function() return nil end
+    return (pred and force(th) or force(el))
+end
+
+---[[
+    local x,p = 33
+    local t = function(x) return function() return x end end
+    assert(ifthenelse(x == 33,1,0) == 1)
+    assert(ifthenelse(x == 42,thunk(1),thunk(0)) == 0)
+    assert(ifthenelse(x == 42,t(1)) == nil)
+--]
