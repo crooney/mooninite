@@ -31,7 +31,7 @@ options = Options
        <> help "Print lua runtime to STDOUT and exit" )
     <*> strOption ( short 'i' <> metavar "PROGRAM" <> value "lua" <> showDefault
        <> help "Invoke PROGRAM as lua interpreter" )
-    <*> strOption ( short 'o' <> metavar "FILE"
+    <*> strOption ( short 'o' <> metavar "FILE" <> value ""
        <> help "Output to FILE instead of STDOUT" )
     <*> some (argument str (metavar "FILES..."))
 
@@ -56,7 +56,8 @@ mainWithOpts os = do
     when (oRuntime os) (putStrLn runtime >> exitSuccess)
     inform $ "Compiling to " ++ if null (oOutput os) then "STDOUT"
                                                      else oOutput os
-    liftM (compile $ oInput os) (allIn $ oInput os) >>= fOut
+    ((++) <$> return runtime <*> liftM (compile $ oInput os) (allIn $ oInput os))
+      >>= fOut
     when (oIntermediate os || null (oOutput os)) exitSuccess
     (code,out,err) <- readProcessWithExitCode (oLua os) [oOutput os] ""
     when (code /= ExitSuccess) $ inform $ oLua os ++ " failed with: "
@@ -64,6 +65,6 @@ mainWithOpts os = do
     _ <- exitWith code
     _ <- return $ oVersion os -- quiet compiler TODO figure out how to remove.
     return ()
-  where compile as = parseLisp (intercalate ", " as)
+  where compile as =  parseLisp (intercalate ", " as)
         inform m = when (oVerbose os) $ hPutStrLn stderr m
         fOut = if null (oOutput os) then putStr else writeFile (oOutput os)

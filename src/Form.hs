@@ -2,29 +2,35 @@
 
 module Form where
 
-import           Data.List
+import qualified Data.List as L
 
-data Form = Form { minArgs :: Int
-                 , maxArgs :: Int
+data Form = Form { minArgs  :: Int
+                 , maxArgs  :: Int
                  , validate :: Form -> Bool
-                 , fShow :: Form -> String
-                 , args :: [Form]
+                 , orig     :: Form -> String
+                 , gen      :: Form -> String
+                 , args     :: [Form]
                  }
 
-instance Show Form where
-    show f = fShow f f
+gShow,oShow :: Form -> String
+gShow f = gen f f
+oShow f = orig f f
 
 arg :: Form -> Int -> String
-arg f i = fShow a a
+arg f i = gen a a
   where a = args f !! i
 
-rest :: String -> Form -> Int -> String
-rest s f i = intercalate s $ map (arg f) [i .. (length (args f) - 1)]
+intercalate :: String -> [Form] -> String
+intercalate s = L.intercalate s . map gShow
 
-restComma, restSpace, restSemi :: Form -> Int -> String
+rest :: String -> Form -> Int -> String
+rest s f i = intercalate s $ drop i $ args f
+
+restComma, restSpace, restSemi, restLine :: Form -> Int -> String
 restComma = rest ","
 restSpace = rest " "
 restSemi  = rest ";"
+restLine  = rest "\n"
 
 fWith :: Form -> [Form] -> Form
 fWith f xs = f {args = xs}
@@ -37,40 +43,13 @@ fDef = Form { minArgs  = 0
             , maxArgs  = 1000
             , args     = []
             , validate = val
-            , fShow    = undefined
+            , gen      = undefined
+            , orig     = undefined
             }
   where val f = (minArgs f <= length (args f)) && (length (args f) <= maxArgs f)
 
 fSelf :: String -> Form
-fSelf s = fDef {fShow = const s}
-
-fIf, fCall, fAssign, fLocal, fScope, fLambda, fQList :: Form
-fIf = fDef { minArgs  = 3
-           , maxArgs  = 3
-           , fShow = \f -> concat [ "if ", arg f 0, " then \n", arg f 1
-                                  , "\nelse ", arg f 2," end\n"]
-           }
-
-fCall = fDef { minArgs  = 1
-             , fShow = \f -> concat [arg f 0 , "(", restComma f 1, ")\n"]
-             }
-
-fAssign = fDef { minArgs  = 2
-               , maxArgs  = 2
-               , fShow = \f -> concat [arg f 0, " = ", arg f 1, "\n"]
-               }
-fLocal = fAssign { fShow =
-                     \f -> concat ["local", arg f 0, " = ", arg f 1, "\n"] }
-
-fScope = fDef { fShow = \f -> concat ["do\n", restSpace f 0, "end\n"] }
-
-fLambda = fDef { minArgs = 2
-               , fShow = \f -> concat ["function ", arg f 0, parens (arg f 1)
-                                      , restSemi f 2, " end\n"]
-               }
-
-fQList = fDef { fShow = \f -> if null (args f) then " nil "
-                              else "Runtime.list" ++ parens (restComma f 0) }
+fSelf s = fDef {gen = const s, orig = const s}
 
 surround :: String -> String -> String -> String
 surround l r s = concat [l, s, r]
@@ -80,7 +59,3 @@ parens   = surround "(" ")"
 brackets = surround "[" "]"
 braces   = surround "{" "}"
 quotes   = surround "\"" "\""
-
--- main = do print $ fIf {args = [fSelf "foo", fSelf "bar", fSelf "baz"]}
---           print $ fCall {args = map fSelf ["push","3","3","44","44","5"]}
---           print $ fWith fScope [(fWithS fAssign ["x","100"]),(fWithS fCall ["pop"])]
