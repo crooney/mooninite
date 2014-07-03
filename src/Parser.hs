@@ -13,8 +13,7 @@ import           Text.ParserCombinators.UU.Derived
 import           Text.ParserCombinators.UU.Core
 import           Text.ParserCombinators.UU.BasicInstances
 import           Text.ParserCombinators.UU.Utils
-                   hiding (pSpaces, lexeme, pParens, pBrackets)
-import qualified Text.ParserCombinators.UU.Utils as U
+                   hiding (lexeme, pParens, pBrackets)
 
 import           Form
 import           Form.Lua
@@ -69,30 +68,30 @@ pBindings = pParens $ fWith fBindList <$> pSome go <?> "Bindings"
   where go = pParens $ fWith fLocal <$> pIdent <:> pExact 1 pElem <?> "Binding"
 
 parseLisp :: String -> String -> String
-parseLisp desc = concatMap gShow . runParser desc (pSpaces *> pMany pSexp)
+parseLisp desc = concatMap gShow . runParser desc (pWhitespace *> pMany pSexp)
 
 -- utility funcs.
 
-pSpaces :: Parser String
-pSpaces = const "" <$> pMany (pAnySym ", \t\r\n")
+pWhitespace :: Parser String
+pWhitespace = const "" <$> pMany (pAnySym ", \t\r\n" <|> pComment)
+  <?> "Whitespace"
+
+pComment :: Parser Char
+pComment = const ' ' <$>
+    ((pSymbol ";|" <* pSexp) <<|>
+        (pSym ';' *> (pSome $ pAnySym $ filter (/= '\n') ['\000' .. '\254'])))
+    <?> "Comment"
 
 lexeme :: ParserTrafo a a
-lexeme p = p <* pSpaces
+lexeme p = p <* pWhitespace
 
 infixr 5 <:>
-(<:>) :: Parser a -> Parser [a] -> Parser [a]
+(<:>) :: Applicative f => f a -> f [a] -> f [a]
 p <:> q = (:) <$> p <*> q
 
 pParens, pBrackets :: ParserTrafo a a
-pParens = lexeme . U.pParens
-pBrackets = lexeme . U.pBrackets
+pParens = lexeme . pPacked pLParen pRParen
+pBrackets = lexeme . pPacked pLBracket pRBracket
 
 pChoice :: IsParser p => [p a] -> p a
-pChoice = foldr1 (<|>)
-
--- pComment :: Parser Form
--- pComment = LComment <$>
---     ((const "" <$> pToken ";|" <* pSexp)
---     <<|> (pToken ";#" *> pMunch (/= '\n'))
---     <<|> (const "" <$> (pToken ";" *> pMunch (/= '\n'))))
---     <?> "Comment"
+pChoice = pAny id
