@@ -5,10 +5,6 @@ module Parser (
       parseLisp
     ) where
 
-import           Prelude          hiding (lookup)
-import           Data.Char
-import           Data.List
--- import           Data.Map         hiding (map)
 import           Text.ParserCombinators.UU.Derived
 import           Text.ParserCombinators.UU.Core
 import           Text.ParserCombinators.UU.BasicInstances
@@ -22,30 +18,26 @@ pSpecial :: Parser Form
 pSpecial = pChoice
   [ fWith fIf <$> (pSymbol "if" *> pExact 3 pElem)
   , fWith fIf <$> (pSymbol "when" *> pExact 2 pElem)
-  , fWith fScope <$> (pSymbol "let" *> pBindings <:> pMany pElem)
-  , fWith fLambda <$> (pSymbol "lambda" *> pParams <:> pMany pElem)
-  , fWith fAssign <$> ((pSymbol "set!" <|> pSymbol "define") *> pExact 2 pElem)
-  , fWith fProg <$> (pSymbol "begin" *> pSome pElem)
+  , fWith fScope <$> ((pSymbol "letfn" <|> pSymbol "let") *> pBindings (pElem <|> pLambda)
+                      <:> pMany pElem)
+  , pLambda
+  , fWith fOnce <$> (pSymbol "defonce" *> pExact 2 pElem)
+  , fWith fAssign <$> (pSymbol "defn" *> pIdent <:> pExact 1 (fWith fLambda <$>
+      (pParams <:> pSome pElem)))
+  , fWith fAssign <$> ((pSymbol "set!" <|> pSymbol "def") *> pExact 2 pElem)
+  , fWith fProg <$> (pSymbol "do" *> pSome pElem)
   ]
 
--- Lua doesn't support any non-alphanumeric characters in identifiers
--- except '_', ':' and '.' . Scheme supports many, but is case insensitive, so
--- we downcase and then map bad characters to capital letters.
 pName :: Parser String
-pName = lexeme $ map (go . toLower) <$>
-        (pLetter <|> pAnySym (drop 2 legalChars))
-        <:> pMany (pDigit <|> pLetter <|> pAnySym legalChars)
-  where go x =  case x `elemIndex` badChars of
-                 Just i  -> goodChars !! i
-                 Nothing -> x
-        badChars   = "+-!$%&*/<=>?@^~"
-        goodChars  = take (length badChars) ['A' ..]
-        legalChars = badChars ++ "._:"
+pName = lexeme $ pSymbol "+" <|> pSymbol "-" <|>
+        ((pLetter <|> pAnySym (drop 2 legal))
+        <:> pMany (pDigit <|> pLetter <|> pAnySym legal))
+  where legal = "+-!$%&*/<=>?@^~._:"
 
-pIdent,pAtom,pNumber,pString,pMultiString,pSexp,pQList,pElem
-  ,pParams,pBindings :: Parser Form
+pIdent, pAtom, pNumber, pString, pMultiString, pSexp, pQList, pElem
+  , pParams, pVector, pLambda :: Parser Form
 
-pIdent = fSelf <$> pName <?> "Identifier"
+pIdent = fIdent <$> pName <?> "Identifier"
 pAtom = fSelf <$> pSym '#' <:> pName <?> "Atom"
 pNumber = (fSelf . show) <$> pDouble <?> "Number"
 
@@ -60,15 +52,20 @@ pSexp = pParens $ pSpecial `micro` 1 <|> call `micro` 2 <?> "S-expression"
 pQList = fWith fQList <$> (pSym '\'' *> pParens (pMany pElem)) <?> "Quoted List"
 
 pElem = pChoice [ pIdent, pAtom, pNumber, pString, pMultiString, pSexp, pQList
-                ]
+                , pVector]
 
 pParams = pParens $ fWith fList <$> pMany pIdent <?> "Lambda parameters"
 
-pBindings = pParens $ fWith fBindList <$> pSome go <?> "Bindings"
-  where go = pParens $ fWith fLocal <$> pIdent <:> pExact 1 pElem <?> "Binding"
+pVector = fWith fVector <$> pBrackets (pMany pElem) <?> "Vector"
+
+pLambda = fWith fLambda <$> (pSymbol "fn" *> pParams <:> pMany pElem)
+
+pBindings :: Parser Form -> Parser Form
+pBindings f = pParens $ fWith fBindList <$> pSome go <?> "Bindings"
+  where go = pParens $ fWith fAssign <$> pIdent <:> pExact 1 f <?> "Binding"
 
 parseLisp :: String -> String -> String
-parseLisp desc = concatMap gShow . runParser desc (pWhitespace *> pMany pSexp)
+parseLisp desc = concatMap gShow . runParser desc (pWhitespace *> pMany pElem)
 
 -- utility funcs.
 
@@ -79,7 +76,7 @@ pWhitespace = const "" <$> pMany (pAnySym ", \t\r\n" <|> pComment)
 pComment :: Parser Char
 pComment = const ' ' <$>
     ((pSymbol ";|" <* pSexp) <<|>
-        (pSym ';' *> (pSome $ pAnySym $ filter (/= '\n') ['\000' .. '\254'])))
+        (pSym ';' *> pSome (pAnySym $ filter (/= '\n') ['\000' .. '\254'])))
     <?> "Comment"
 
 lexeme :: ParserTrafo a a
